@@ -491,60 +491,54 @@ struct Camera {
     bottom_left: Vec3,
     horizontal: Vec3,
     vertical: Vec3,
-}
-
-impl Default for Camera {
-    // Для простоты кода в примере зададим все необходимые значения
-    // в конструкторе по умолчанию.
-    fn default() -> Self {
-        Camera {
-            origin: [0.0, 0.0, 0.0].into(),
-            bottom_left: [-2.0, -1.0, -1.0].into(),
-            horizontal: [4.0, 0.0, 0.0].into(),
-            vertical: [0.0, 2.0, 0.0].into(),
-        }
-    }
+    u: Vec3,
+    v: Vec3,
+    lens_radius: f32,
 }
 
 impl Camera {
-    /// Создает камеру с заданным полем зрения.
-    #[allow(dead_code)]
-    fn with_viewport(vfov: f32, aspect: f32) -> Self{
-        let theta = vfov * std::f32::consts::PI / 180.0;
-        let half_height = (theta / 2.0).tan();
-        let half_width = aspect * half_height;
-
-        Camera {
-            origin: [0.0, 0.0, 0.0].into(),
-            bottom_left: [-half_width, -half_height, -1.0].into(),
-            horizontal: [half_width * 2.0, 0.0, 0.0].into(),
-            vertical: [0.0, 2.0 * half_height, 0.0].into(),
-        }
-    }
-
-    fn new(look_from: Vec3, look_at: Vec3, up: Vec3, vfov: f32, aspect: f32) -> Self {
+    fn new(look_from: Vec3, look_at: Vec3, up: Vec3, vfov: f32, aspect: f32, aperture: f32, focus: f32) -> Self {
         let theta = vfov * std::f32::consts::PI / 180.0;
         let height = 2.0 * (theta / 2.0).tan();
         let width = aspect * height;
         let w = unit_vector(look_from - look_at);
         let u = unit_vector(cross(up, w));
         let v = cross(w, u);
-        let horizontal = width * u;
-        let vertical = height * v;
+        let horizontal = width * u * focus;
+        let vertical = height * v * focus;
 
         Camera {
             origin: look_from,
-            bottom_left: look_from - horizontal / 2.0 - vertical / 2.0 - w,
+            bottom_left: look_from - horizontal / 2.0 - vertical / 2.0 - focus * w,
             horizontal,
             vertical,
+            u, v,
+            lens_radius: aperture / 2.0,
         }
     }
 
     /// Направляет луч из местоположения камеры в точку на виртуальном экране.
     fn direct_ray(&self, s: f32, t: f32) -> Ray {
-        let to = self.bottom_left + s * self.horizontal + t * self.vertical - self.origin;
+        let rd = self.lens_radius * random_in_unit_disk();
+        let offset = self.u * rd.x() + self.v * rd.y();
+        let to = self.bottom_left + s * self.horizontal + t * self.vertical - self.origin - offset;
 
-        Ray::new(self.origin, to)
+        Ray::new(self.origin + offset, to)
+    }
+}
+
+fn random_in_unit_disk() -> Vec3 {
+    let mut rng = rand::thread_rng();
+    let dist = Uniform::from(0.0..1.0 as f32);
+
+    loop {
+        let x = dist.sample(&mut rng);
+        let y = dist.sample(&mut rng);
+        let p = 2.0 * Vec3::new(x, y, 0.0) - Vec3::new(1.0, 1.0, 0.0);
+
+        if dot(p, p) < 1.0 {
+            return p;
+        }
     }
 }
 
@@ -733,7 +727,11 @@ fn main() {
     println!("{} {}", width, height);
     println!("255");
 
-    let camera = Camera::new([-2.0, 2.0, 1.0].into(), [0.0, 0.0, -1.0].into(), [0.0, 1.0, 0.0].into(), 20.0, width as f32 / height as f32);
+    let look_from: Vec3 = [3.0, 3.0, 2.0].into();
+    let look_at: Vec3 = [0.0, 0.0, -1.0].into();
+    let up: Vec3 = [0.0, 1.0, 0.0].into();
+    let focus = (look_from - look_at).length();
+    let camera = Camera::new(look_from, look_at, up, 20.0, width as f32 / height as f32, 2.0, focus);
     let scene = Scene{
         0: vec![
             Box::new(Sphere{
