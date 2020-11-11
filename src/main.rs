@@ -369,13 +369,29 @@ impl Ray {
     }
 }
 
+fn hit_sphere(ray: &Ray, center: Vec3, radius: f32) -> bool {
+    let oc = ray.origin() - center;
+    let a = dot(ray.direction(), ray.direction());
+    let b = 2.0 * dot(oc, ray.direction());
+    let c = dot(oc, oc) - radius * radius;
+    let discriminant = b * b - 4.0 * a * c;
+
+    discriminant > 0.0
+}
+
 fn background(ray: &Ray) -> Vec3 {
-    let unit_direction = unit_vector(ray.direction());
-    let t = 0.5 * (unit_direction.y() + 1.0);
     let white: Vec3 = [1.0, 1.0, 1.0].into();
     let light_blue: Vec3 = [0.5, 0.7, 1.0].into();
+    let red: Vec3 = [1.0, 0.0, 0.0].into();
 
-    (1.0 - t) * white + t * light_blue
+    if hit_sphere(ray,[0.0, 0.0, -1.0].into(), 0.5) {
+        red
+    } else {
+        let unit_direction = unit_vector(ray.direction());
+        let t = 0.5 * (unit_direction.y() + 1.0);
+
+        (1.0 - t) * white + t * light_blue
+    }
 }
 
 fn main() {
