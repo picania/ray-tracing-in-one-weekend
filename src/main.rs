@@ -589,9 +589,68 @@ impl Material for Metal {
     }
 }
 
+/// Описывает преломляющее свет тело.
+struct Dielectric {
+    ref_index: f32
+}
+
+impl Material for Dielectric {
+    fn scatter(&self, ray: &Ray, record: &HitRecord) -> Option<(Ray, Vec3)> {
+        let outward_normal;
+        let ni_over_nt;
+        let attenuation: Vec3 = [1.0, 1.0, 1.0].into();
+        let cosine;
+
+        if dot(ray.direction(), record.normal) > 0.0 {
+            outward_normal = -record.normal;
+            ni_over_nt = self.ref_index;
+            cosine = self.ref_index * dot(ray.direction(), record.normal) / ray.direction().length();
+        } else {
+            outward_normal = record.normal;
+            ni_over_nt = 1.0 / self.ref_index;
+            cosine = -dot(ray.direction(), record.normal) / ray.direction().length();
+        }
+
+        let mut rng = rand::thread_rng();
+        let dist = Uniform::from(0.0..1.0 as f32);
+        let reflected = reflect(ray.direction(), record.normal);
+        if let Some(refracted) = refract(ray.direction(), outward_normal, ni_over_nt) {
+            let reflect_prob = schlick(cosine, self.ref_index);
+            if dist.sample(&mut rng) < reflect_prob {
+                Some((Ray{from: record.point, to: reflected}, attenuation))
+            } else {
+                Some((Ray{from: record.point, to: refracted}, attenuation))
+            }
+        } else {
+            Some((Ray{from: record.point, to: reflected}, attenuation))
+        }
+    }
+}
+
 /// Описывает закон отражения луча от поверхности.
 fn reflect(vec: Vec3, normal: Vec3) -> Vec3 {
     vec - 2.0 * dot(vec, normal) * normal
+}
+
+/// Описывает закон преломления луча на поверхности тела.
+fn refract(vec: Vec3, normal: Vec3, ni_over_nt: f32) -> Option<Vec3> {
+    let uv = unit_vector(vec);
+    let dt = dot(uv, normal);
+    let discriminant = 1.0 - ni_over_nt * ni_over_nt * (1.0 - dt * dt);
+
+    if discriminant > 0.0 {
+        Some(ni_over_nt * (uv - normal * dt) - normal * discriminant.sqrt())
+    } else {
+        None
+    }
+}
+
+/// Приближение Шлика для коэффициента внутреннего отражения.
+fn schlick(cosine: f32, ref_index: f32) -> f32 {
+    let r0 = (1.0 - ref_index) / (1.0 + ref_index);
+    let r0 = r0 * r0;
+
+    r0 + (1.0 - r0) * f32::powi(1.0 - cosine, 5)
 }
 
 /// Создает случайный вектор внутри единичной сферы методом исключения.
@@ -656,7 +715,7 @@ fn main() {
         0: vec![
             Box::new(Sphere{
                 center: [0.0, 0.0, -1.0].into(), radius: 0.5,
-                material: Rc::new(Lambert{albedo: [0.8, 0.3, 0.3].into()})
+                material: Rc::new(Lambert{albedo: [0.1, 0.2, 0.5].into()})
             }),
             Box::new(Sphere{
                 center: [0.0, -100.5, -1.0].into(), radius: 100.0,
@@ -668,18 +727,14 @@ fn main() {
             }),
             Box::new(Sphere{
                 center: [-1.0, 0.0, -1.0].into(), radius: 0.5,
-                material: Rc::new(Metal::with_albedo([0.8, 0.8, 0.8].into()))
+                material: Rc::new(Dielectric{ref_index: 1.5})
             }),
-            // Можно закомментировать две металлические сферы выше и расскоментировать
-            // две сферы ниже, чтобы посмотреть как ведут себя матовые металлы.
-            // Box::new(Sphere{
-            //     center: [1.0, 0.0, -1.0].into(), radius: 0.5,
-            //     material: Rc::new(Metal::with_albedo_fuzz([0.8, 0.6, 0.2].into(), 1.0))
-            // }),
-            // Box::new(Sphere{
-            //     center: [-1.0, 0.0, -1.0].into(), radius: 0.5,
-            //     material: Rc::new(Metal::with_albedo_fuzz([0.8, 0.8, 0.8].into(), 0.3))
-            // }),
+            // Еще одна стеклянная сфера меньшего диаметра с отрицательным радиусом
+            // вместе с первой создают эффект полого стеклянного шара.
+            Box::new(Sphere{
+                center: [-1.0, 0.0, -1.0].into(), radius: -0.45,
+                material: Rc::new(Dielectric{ref_index: 1.5})
+            }),
         ]
     };
 
