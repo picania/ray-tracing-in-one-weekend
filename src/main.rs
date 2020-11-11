@@ -2,6 +2,7 @@ use std::ops::{Add, AddAssign, Div, DivAssign, Index, IndexMut, Mul, MulAssign, 
 use std::fmt::{Display, Formatter, Result};
 use rand::distributions::{Distribution, Uniform};
 use std::rc::Rc;
+use rand::Rng;
 
 /// Преобразует цветовые компоненты пикселя к [`u8`] и печатает на экран.
 ///
@@ -718,48 +719,77 @@ where
     Vec3::new(color.r().sqrt(), color.g().sqrt(), color.b().sqrt())
 }
 
+fn random_scene() -> Scene {
+    let mut scene: Vec<Box<dyn Hittable>> = vec![];
+    let rng = rand::thread_rng();
+
+    // Итератор по случайным числам.
+    let mut rnd = rng.sample_iter(Uniform::from(0.0..1.0 as f32));
+
+    // Шар - земля.
+    scene.push(Box::new(Sphere{center: [0.0, -1000.0, 0.0].into(), radius: 1000.0,
+        material: Rc::new(Lambert{albedo: [0.5, 0.5, 0.5].into()})
+    }));
+
+    // Случайно рассыпанные шарики.
+    for a in -11..11 {
+        for b in -11..11 {
+            let material_rate = rnd.next().unwrap();
+            let center: Vec3 = [a as f32 + 0.9 * rnd.next().unwrap(), 0.2, b as f32 + 0.9 * rnd.next().unwrap()].into();
+
+            if (center - Vec3::new(4.0, 0.2, 0.0)).length() > 0.9 {
+                let material: Rc<dyn Material>;
+                let x = rnd.next().unwrap();
+                let y = rnd.next().unwrap();
+                let z = rnd.next().unwrap();
+                let fuzz = rnd.next().unwrap();
+
+                if material_rate < 0.8 {
+                    material = Rc::new(Lambert{albedo: [x * x, y * y, z * z].into()});
+                } else if material_rate < 0.95 {
+                    material = Rc::new(Metal{albedo: [0.5 * (1.0 + x), 0.5 * (1.0 + y), 0.5 * (1.0 + z)].into(), fuzz});
+                } else {
+                    material = Rc::new(Dielectric{ref_index: 1.5});
+                }
+
+                scene.push(Box::new(Sphere{center, radius: 0.2, material}));
+            }
+        }
+    }
+
+    // Три больших шарика в центре.
+    scene.push(Box::new(Sphere{center: [0.0, 1.0, 0.0].into(), radius: 1.0,
+        material: Rc::new(Dielectric{ref_index: 1.5})
+    }));
+    scene.push(Box::new(Sphere{center: [-4.0, 1.0, 0.0].into(), radius: 1.0,
+        material: Rc::new(Lambert{albedo: [0.4, 0.2, 0.1].into()})
+    }));
+    scene.push(Box::new(Sphere{center: [4.0, 1.0, 0.0].into(), radius: 1.0,
+        material: Rc::new(Metal{albedo: [0.7, 0.6, 0.5].into(), fuzz: 0.0})
+    }));
+
+    Scene(scene)
+}
+
 fn main() {
-    let width = 200;
-    let height = 100;
+    let aspect = 3.0 / 2.0 as f32;
+    let width = 1200;
+    let height = (width as f32 / aspect) as i32;
 
     // Выводим заголовок формата PPM
     println!("P3");
     println!("{} {}", width, height);
     println!("255");
 
-    let look_from: Vec3 = [3.0, 3.0, 2.0].into();
-    let look_at: Vec3 = [0.0, 0.0, -1.0].into();
+    let look_from: Vec3 = [13.0, 2.0, 3.0].into();
+    let look_at: Vec3 = [0.0, 0.0, 0.0].into();
     let up: Vec3 = [0.0, 1.0, 0.0].into();
-    let focus = (look_from - look_at).length();
-    let camera = Camera::new(look_from, look_at, up, 20.0, width as f32 / height as f32, 2.0, focus);
-    let scene = Scene{
-        0: vec![
-            Box::new(Sphere{
-                center: [0.0, 0.0, -1.0].into(), radius: 0.5,
-                material: Rc::new(Lambert{albedo: [0.1, 0.2, 0.5].into()})
-            }),
-            Box::new(Sphere{
-                center: [0.0, -100.5, -1.0].into(), radius: 100.0,
-                material: Rc::new(Lambert{albedo: [0.8, 0.8, 0.0].into()})
-            }),
-            Box::new(Sphere{
-                center: [1.0, 0.0, -1.0].into(), radius: 0.5,
-                material: Rc::new(Metal::with_albedo([0.8, 0.6, 0.2].into()))
-            }),
-            Box::new(Sphere{
-                center: [-1.0, 0.0, -1.0].into(), radius: 0.5,
-                material: Rc::new(Dielectric{ref_index: 1.5})
-            }),
-            // Еще одна стеклянная сфера меньшего диаметра с отрицательным радиусом
-            // вместе с первой создают эффект полого стеклянного шара.
-            Box::new(Sphere{
-                center: [-1.0, 0.0, -1.0].into(), radius: -0.45,
-                material: Rc::new(Dielectric{ref_index: 1.5})
-            }),
-        ]
-    };
-
-    let samples = 100;
+    let focus = 10.0;
+    let camera = Camera::new(look_from, look_at, up, 20.0, aspect, 0.1, focus);
+    let scene = random_scene();
+    // Осторожно с этим числом. Большие значения (>100) могут увеличить время отрисовки до
+    // нескольких часов.
+    let samples = 5;
 
     // Выводим остальные пиксели построчно начиная с верхнего левого угла изображения
     for y in 0..height {

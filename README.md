@@ -27,4 +27,4 @@ cargo run --release > render.ppm
 
 **Литература:**  
 * [_Ray Tracing in One Weekend_](https://raytracing.github.io/books/RayTracingInOneWeekend.html).
-* [_Ray Tracing in One Weekend (Series)_](https://raytracing.github.io/)
+* [_Ray Tracing in One Weekend (Series)_](https://raytracing.github.io/).
