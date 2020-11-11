@@ -1,15 +1,7 @@
-use std::ops::Add;
-use std::ops::AddAssign;
-use std::ops::Div;
-use std::ops::DivAssign;
-use std::ops::Index;
-use std::ops::IndexMut;
-use std::ops::Mul;
-use std::ops::MulAssign;
-use std::ops::Neg;
-use std::ops::Sub;
-use std::ops::SubAssign;
+use std::ops::{Add, AddAssign, Div, DivAssign, Index, IndexMut, Mul, MulAssign, Neg, Sub, SubAssign};
 use std::fmt::{Display, Formatter, Result};
+use rand::distributions::{Distribution, Uniform};
+use std::rc::Rc;
 
 /// Преобразует цветовые компоненты пикселя к [`u8`] и печатает на экран.
 ///
@@ -392,6 +384,7 @@ struct HitRecord {
     t: f32,
     point: Vec3,
     normal: Vec3,
+    material: Rc<dyn Material>,
 }
 
 /// Типаж для реализации попадания луча в объект.
@@ -399,10 +392,11 @@ trait Hittable {
     fn hit(&self, ray: &Ray, t_min: f32, t_max: f32) -> Option<HitRecord>;
 }
 
-/// Описывает положение и радиус сферы.
+/// Описывает положение, радиус и материал сферы.
 struct Sphere {
     center: Vec3,
     radius: f32,
+    material: Rc<dyn Material>,
 }
 
 impl Hittable for Sphere {
@@ -419,7 +413,7 @@ impl Hittable for Sphere {
                 let point = ray.point_at_parameter(t);
                 let normal = (point - self.center) / self.radius;
 
-                return Some(HitRecord{ t, point, normal });
+                return Some(HitRecord{ t, point, normal, material: self.material.clone() });
             }
 
             let t = (-b + discriminant.sqrt()) / 2.0 / a;
@@ -427,7 +421,7 @@ impl Hittable for Sphere {
                 let point = ray.point_at_parameter(t);
                 let normal = (point - self.center) / self.radius;
 
-                return Some(HitRecord{ t, point, normal });
+                return Some(HitRecord{ t, point, normal, material: self.material.clone() });
             }
         }
 
@@ -454,7 +448,8 @@ impl Hittable for Scene {
 }
 
 /// Вычисляет цвет точки на экране.
-fn pixel_color<T>(ray: &Ray, object: &T) -> Vec3
+#[allow(clippy::collapsible_if)]
+fn pixel_color<T>(ray: &Ray, object: &T, depth: i32) -> Vec3
 where
     T: Hittable
 {
@@ -464,9 +459,16 @@ where
     let record = object.hit(ray, 0.001, f32::MAX);
     match record {
         Some(hit) => {
-            let target = hit.point + hit.normal + random_in_unit_sphere();
-            let ray = Ray{ from: hit.point, to: target - hit.point };
-            0.5 * pixel_color(&ray, object)
+            // Глубина трассировки луча ограничена
+            if depth >= 50 {
+                Vec3::default()
+            } else {
+                if let Some((scattered, attenuation)) = hit.material.scatter(&ray, &hit) {
+                    attenuation * pixel_color(&scattered, object, depth + 1)
+                } else {
+                    Vec3::default()
+                }
+            }
         },
         None => {
             let unit_direction = unit_vector(ray.direction());
@@ -523,7 +525,74 @@ impl Camera {
     }
 }
 
-use rand::distributions::{Distribution, Uniform};
+/// Типаж реализует взаимодействие поверхности тела со светом.
+trait Material {
+    fn scatter(&self, ray: &Ray, record: &HitRecord) -> Option<(Ray, Vec3)>;
+}
+
+/// Описывает рассеивающее тело.
+struct Lambert {
+    albedo: Vec3
+}
+
+/// Реализует рассеяние света по закону Ламберта.
+impl Material for Lambert {
+    fn scatter(&self, _: &Ray, record: &HitRecord) -> Option<(Ray, Vec3)> {
+        let target = record.point + record.normal + random_in_unit_sphere();
+        let scattered = Ray{ from: record.point, to: target - record.point };
+
+        Some((scattered, self.albedo))
+    }
+}
+
+/// Описывает отражающее тело.
+#[allow(dead_code)]
+struct Metal {
+    albedo: Vec3,
+    fuzz: f32,
+}
+
+impl Metal {
+    /// Создает металлический материал с идеальной отражающей поверхностью.
+    #[allow(dead_code)]
+    fn with_albedo(albedo: Vec3) -> Self {
+        Metal { albedo, fuzz: 0.0 }
+    }
+
+    /// Создает металлический материал с матовой отражающей поверхностью.
+    ///
+    /// Степень матовости определяется вторым параметром в диапазоне `[0; 1]`.
+    #[allow(dead_code)]
+    fn with_albedo_fuzz(albedo: Vec3, fuzz: f32) -> Self {
+        let f = if fuzz < 0.0 {
+            0.0
+        } else if fuzz > 1.0 {
+            1.0
+        } else {
+            fuzz
+        };
+
+        Metal { albedo, fuzz: f }
+    }
+}
+
+impl Material for Metal {
+    fn scatter(&self, ray: &Ray, record: &HitRecord) -> Option<(Ray, Vec3)> {
+        let reflected = reflect(unit_vector(ray.direction()), record.normal);
+        let scattered = Ray{ from: record.point, to: reflected + self.fuzz * random_in_unit_sphere()};
+
+        if dot(scattered.direction(), record.normal) > 0.0 {
+            Some((scattered, self.albedo))
+        } else {
+            None
+        }
+    }
+}
+
+/// Описывает закон отражения луча от поверхности.
+fn reflect(vec: Vec3, normal: Vec3) -> Vec3 {
+    vec - 2.0 * dot(vec, normal) * normal
+}
 
 /// Создает случайный вектор внутри единичной сферы методом исключения.
 fn random_in_unit_sphere() -> Vec3 {
@@ -564,7 +633,7 @@ where
 
         let ray = camera.direct_ray(u, v);
 
-        color += pixel_color(&ray, object);
+        color += pixel_color(&ray, object, 0);
     }
 
     color /= samples as f32;
@@ -585,8 +654,32 @@ fn main() {
     let camera = Camera::with_resolution(Resolution{ width, height });
     let scene = Scene{
         0: vec![
-            Box::new(Sphere{center: [0.0, 0.0, -1.0].into(), radius: 0.5}),
-            Box::new(Sphere{center: [0.0, -100.5, -1.0].into(), radius: 100.0}),
+            Box::new(Sphere{
+                center: [0.0, 0.0, -1.0].into(), radius: 0.5,
+                material: Rc::new(Lambert{albedo: [0.8, 0.3, 0.3].into()})
+            }),
+            Box::new(Sphere{
+                center: [0.0, -100.5, -1.0].into(), radius: 100.0,
+                material: Rc::new(Lambert{albedo: [0.8, 0.8, 0.0].into()})
+            }),
+            Box::new(Sphere{
+                center: [1.0, 0.0, -1.0].into(), radius: 0.5,
+                material: Rc::new(Metal::with_albedo([0.8, 0.6, 0.2].into()))
+            }),
+            Box::new(Sphere{
+                center: [-1.0, 0.0, -1.0].into(), radius: 0.5,
+                material: Rc::new(Metal::with_albedo([0.8, 0.8, 0.8].into()))
+            }),
+            // Можно закомментировать две металлические сферы выше и расскоментировать
+            // две сферы ниже, чтобы посмотреть как ведут себя матовые металлы.
+            // Box::new(Sphere{
+            //     center: [1.0, 0.0, -1.0].into(), radius: 0.5,
+            //     material: Rc::new(Metal::with_albedo_fuzz([0.8, 0.6, 0.2].into(), 1.0))
+            // }),
+            // Box::new(Sphere{
+            //     center: [-1.0, 0.0, -1.0].into(), radius: 0.5,
+            //     material: Rc::new(Metal::with_albedo_fuzz([0.8, 0.8, 0.8].into(), 0.3))
+            // }),
         ]
     };
 
