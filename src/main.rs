@@ -474,20 +474,88 @@ where
     }
 }
 
+/// Описывает разрешение виртуального "экрана", на котором будет нарисовано финальное изображение.
+struct Resolution {
+    width: i32,
+    height: i32,
+}
+
+/// Описывает параметры, необходимые для отрисовки финального изображения.
+struct Camera {
+    origin: Vec3,
+    bottom_left: Vec3,
+    horizontal: Vec3,
+    vertical: Vec3,
+    resolution: Resolution,
+}
+
+impl Default for Camera {
+    // Для простоты кода в примере зададим все необходимые значения
+    // в конструкторе по умолчанию.
+    fn default() -> Self {
+        Camera {
+            origin: [0.0, 0.0, 0.0].into(),
+            bottom_left: [-2.0, -1.0, -1.0].into(),
+            horizontal: [4.0, 0.0, 0.0].into(),
+            vertical: [0.0, 2.0, 0.0].into(),
+            resolution: Resolution{ width: 0, height: 0 },
+        }
+    }
+}
+
+impl Camera {
+    /// Создает камеру с экраном необходимого разрешения.
+    fn with_resolution(res: Resolution) -> Self {
+        let mut camera = Camera::default();
+
+        camera.resolution = res;
+        camera
+    }
+
+    /// Направляет луч из местоположения камеры в точку на виртуальном экране.
+    fn direct_ray(&self, u: f32, v: f32) -> Ray {
+        let to = self.bottom_left + u * self.horizontal + v * self.vertical;
+
+        Ray::new(self.origin, to)
+    }
+}
+
+use rand::distributions::{Distribution, Uniform};
+
+/// Усредняет цвет в окрестностях пикселя, делая `samples` выборок.
+fn sampled_pixel_color<T>(camera: &Camera, object: &T, samples: i32, x: i32, y: i32) -> Vec3
+where
+    T: Hittable
+{
+    let mut color = Vec3::default();
+    let mut rng = rand::thread_rng();
+    let distribution = Uniform::from(0.0..1.0 as f32);
+    let nx = camera.resolution.width;
+    let ny = camera.resolution.height;
+
+    for _ in 0..samples {
+        let random = distribution.sample(& mut rng);
+        let u = (x as f32 + random) / nx as f32;
+        let v = ((ny - y) as f32  + random)/ ny as f32;
+
+        let ray = camera.direct_ray(u, v);
+
+        color += pixel_color(&ray, object);
+    }
+
+    color / samples as f32
+}
+
 fn main() {
-    let nx = 200;
-    let ny = 100;
+    let width = 200;
+    let height = 100;
 
     // Выводим заголовок формата PPM
     println!("P3");
-    println!("{} {}", nx, ny);
+    println!("{} {}", width, height);
     println!("255");
 
-    let lower_left_corner: Vec3 = [-2.0, -1.0, -1.0].into();
-    let horizontal: Vec3 = [4.0, 0.0, 0.0].into();
-    let vertical: Vec3 = [0.0, 2.0, 0.0].into();
-    let from: Vec3 = [0.0, 0.0, 0.0].into();
-
+    let camera = Camera::with_resolution(Resolution{ width, height });
     let scene = Scene{
         0: vec![
             Box::new(Sphere{center: [0.0, 0.0, -1.0].into(), radius: 0.5}),
@@ -495,15 +563,12 @@ fn main() {
         ]
     };
 
-    // Выводим остальные пиксели построчно начиная с верхнего левого угла изображения
-    for y in 0..ny {
-        for x in 0..nx {
-            let u = x as f32 / nx as f32;
-            let v = (ny - y) as f32 / ny as f32;
-            let to = lower_left_corner + u * horizontal + v * vertical;
-            let ray = Ray::new(from, to);
+    let samples = 100;
 
-            render_pixel(pixel_color(&ray, &scene));
+    // Выводим остальные пиксели построчно начиная с верхнего левого угла изображения
+    for y in 0..height {
+        for x in 0..width {
+            render_pixel(sampled_pixel_color(&camera, &scene, samples, x, y));
         }
     }
 }
