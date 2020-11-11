@@ -118,6 +118,23 @@ impl Add for Vec3 {
     }
 }
 
+/// Оператор сложения вектора со скаляром.
+///
+/// К каждой компоненте вектора прибавляется число.
+impl Add<f32> for Vec3 {
+    type Output = Vec3;
+
+    fn add(self, rhs: f32) -> Self::Output {
+        Self {
+            0: [
+                self.0[0] + rhs,
+                self.0[1] + rhs,
+                self.0[2] + rhs,
+            ],
+        }
+    }
+}
+
 /// Оператор сложения векторов с присваиванием.
 impl AddAssign for Vec3 {
     fn add_assign(&mut self, rhs: Self) {
@@ -369,28 +386,91 @@ impl Ray {
     }
 }
 
-fn hit_sphere(ray: &Ray, center: Vec3, radius: f32) -> bool {
-    let oc = ray.origin() - center;
-    let a = dot(ray.direction(), ray.direction());
-    let b = 2.0 * dot(oc, ray.direction());
-    let c = dot(oc, oc) - radius * radius;
-    let discriminant = b * b - 4.0 * a * c;
-
-    discriminant > 0.0
+/// Параметры попадания луча в объект.
+struct HitRecord {
+    t: f32,
+    point: Vec3,
+    normal: Vec3,
 }
 
-fn background(ray: &Ray) -> Vec3 {
+/// Типаж для реализации попадания луча в объект.
+trait Hittable {
+    fn hit(&self, ray: &Ray, t_min: f32, t_max: f32) -> Option<HitRecord>;
+}
+
+/// Описывает положение и радиус сферы.
+struct Sphere {
+    center: Vec3,
+    radius: f32,
+}
+
+impl Hittable for Sphere {
+    fn hit(&self, ray: &Ray, t_min: f32, t_max: f32) -> Option<HitRecord> {
+        let oc = ray.origin() - self.center;
+        let a = dot(ray.direction(), ray.direction());
+        let b = 2.0 * dot(oc, ray.direction());
+        let c = dot(oc, oc) - self.radius * self.radius;
+        let discriminant = b * b - 4.0 * a * c;
+
+        if discriminant > 0.0 {
+            let t = (-b - discriminant.sqrt()) / 2.0 / a;
+            if t > t_min && t < t_max {
+                let point = ray.point_at_parameter(t);
+                let normal = (point - self.center) / self.radius;
+
+                return Some(HitRecord{ t, point, normal });
+            }
+
+            let t = (-b + discriminant.sqrt()) / 2.0 / a;
+            if t > t_min && t < t_max {
+                let point = ray.point_at_parameter(t);
+                let normal = (point - self.center) / self.radius;
+
+                return Some(HitRecord{ t, point, normal });
+            }
+        }
+
+        None
+    }
+}
+
+/// Массив объектов трехмерной сцены.
+struct Scene(Vec<Box<dyn Hittable>>);
+
+impl Hittable for Scene {
+    fn hit(&self, ray: &Ray, t_min: f32, t_max: f32) -> Option<HitRecord> {
+        let mut rec: Option<HitRecord> = None;
+        let mut closest_so_far = t_max;
+
+        for object in &self.0 {
+            if let Some(obj) = object.hit(ray, t_min, closest_so_far) {
+                closest_so_far = obj.t;
+                rec = Some(obj);
+            }
+        }
+        rec
+    }
+}
+
+/// Вычисляет цвет точки на экране.
+fn pixel_color<T>(ray: &Ray, object: &T) -> Vec3
+where
+    T: Hittable
+{
     let white: Vec3 = [1.0, 1.0, 1.0].into();
     let light_blue: Vec3 = [0.5, 0.7, 1.0].into();
-    let red: Vec3 = [1.0, 0.0, 0.0].into();
 
-    if hit_sphere(ray,[0.0, 0.0, -1.0].into(), 0.5) {
-        red
-    } else {
-        let unit_direction = unit_vector(ray.direction());
-        let t = 0.5 * (unit_direction.y() + 1.0);
+    let record = object.hit(ray, 0.0, f32::MAX);
+    match record {
+        Some(hit) => {
+            0.5 * (hit.normal + 1.0)
+        },
+        None => {
+            let unit_direction = unit_vector(ray.direction());
+            let t = 0.5 * (unit_direction.y() + 1.0);
 
-        (1.0 - t) * white + t * light_blue
+            (1.0 - t) * white + t * light_blue
+        }
     }
 }
 
@@ -408,6 +488,13 @@ fn main() {
     let vertical: Vec3 = [0.0, 2.0, 0.0].into();
     let from: Vec3 = [0.0, 0.0, 0.0].into();
 
+    let scene = Scene{
+        0: vec![
+            Box::new(Sphere{center: [0.0, 0.0, -1.0].into(), radius: 0.5}),
+            Box::new(Sphere{center: [0.0, -100.5, -1.0].into(), radius: 100.0}),
+        ]
+    };
+
     // Выводим остальные пиксели построчно начиная с верхнего левого угла изображения
     for y in 0..ny {
         for x in 0..nx {
@@ -416,7 +503,7 @@ fn main() {
             let to = lower_left_corner + u * horizontal + v * vertical;
             let ray = Ray::new(from, to);
 
-            render_pixel(background(&ray));
+            render_pixel(pixel_color(&ray, &scene));
         }
     }
 }
