@@ -292,6 +292,7 @@ fn dot(a: Vec3, b: Vec3) -> f32 {
 /// Векторное произведение двух векторов. [Подробнее].
 ///
 /// [Подробнее]: https://ru.wikipedia.org/wiki/%D0%92%D0%B5%D0%BA%D1%82%D0%BE%D1%80%D0%BD%D0%BE%D0%B5_%D0%BF%D1%80%D0%BE%D0%B8%D0%B7%D0%B2%D0%B5%D0%B4%D0%B5%D0%BD%D0%B8%D0%B5
+#[allow(dead_code)]
 fn cross(a: Vec3, b: Vec3) -> Vec3 {
     Vec3 {
         0: [
@@ -460,10 +461,12 @@ where
     let white: Vec3 = [1.0, 1.0, 1.0].into();
     let light_blue: Vec3 = [0.5, 0.7, 1.0].into();
 
-    let record = object.hit(ray, 0.0, f32::MAX);
+    let record = object.hit(ray, 0.001, f32::MAX);
     match record {
         Some(hit) => {
-            0.5 * (hit.normal + 1.0)
+            let target = hit.point + hit.normal + random_in_unit_sphere();
+            let ray = Ray{ from: hit.point, to: target - hit.point };
+            0.5 * pixel_color(&ray, object)
         },
         None => {
             let unit_direction = unit_vector(ray.direction());
@@ -522,6 +525,27 @@ impl Camera {
 
 use rand::distributions::{Distribution, Uniform};
 
+/// Создает случайный вектор внутри единичной сферы методом исключения.
+fn random_in_unit_sphere() -> Vec3 {
+    let mut p;
+    let mut rng = rand::thread_rng();
+    let dist = Uniform::from(0.0..1.0 as f32);
+
+    loop {
+        let x = dist.sample(& mut rng);
+        let y = dist.sample(& mut rng);
+        let z = dist.sample(& mut rng);
+
+        p = 2.0 * Vec3::new(x, y, z) - Vec3::new(1.0, 1.0, 1.0);
+
+        if p.square_length() < 1.0 {
+            break;
+        }
+    }
+
+    p
+}
+
 /// Усредняет цвет в окрестностях пикселя, делая `samples` выборок.
 fn sampled_pixel_color<T>(camera: &Camera, object: &T, samples: i32, x: i32, y: i32) -> Vec3
 where
@@ -543,7 +567,10 @@ where
         color += pixel_color(&ray, object);
     }
 
-    color / samples as f32
+    color /= samples as f32;
+
+    // Корректировка гаммы 1/2
+    Vec3::new(color.r().sqrt(), color.g().sqrt(), color.b().sqrt())
 }
 
 fn main() {
