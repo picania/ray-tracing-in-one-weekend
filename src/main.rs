@@ -289,7 +289,7 @@ fn cross(a: Vec3, b: Vec3) -> Vec3 {
     Vec3 {
         0: [
             a.0[1] * b.0[2] - a.0[2] * b.0[1],
-            -a.0[0] * b.0[2] - a.0[2] * b.0[0],
+            a.0[2] * b.0[0] - a.0[0] * b.0[2],
             a.0[0] * b.0[1] - a.0[1] * b.0[0],
         ],
     }
@@ -491,7 +491,6 @@ struct Camera {
     bottom_left: Vec3,
     horizontal: Vec3,
     vertical: Vec3,
-    resolution: Resolution,
 }
 
 impl Default for Camera {
@@ -503,23 +502,47 @@ impl Default for Camera {
             bottom_left: [-2.0, -1.0, -1.0].into(),
             horizontal: [4.0, 0.0, 0.0].into(),
             vertical: [0.0, 2.0, 0.0].into(),
-            resolution: Resolution{ width: 0, height: 0 },
         }
     }
 }
 
 impl Camera {
-    /// Создает камеру с экраном необходимого разрешения.
-    fn with_resolution(res: Resolution) -> Self {
-        let mut camera = Camera::default();
+    /// Создает камеру с заданным полем зрения.
+    #[allow(dead_code)]
+    fn with_viewport(vfov: f32, aspect: f32) -> Self{
+        let theta = vfov * std::f32::consts::PI / 180.0;
+        let half_height = (theta / 2.0).tan();
+        let half_width = aspect * half_height;
 
-        camera.resolution = res;
-        camera
+        Camera {
+            origin: [0.0, 0.0, 0.0].into(),
+            bottom_left: [-half_width, -half_height, -1.0].into(),
+            horizontal: [half_width * 2.0, 0.0, 0.0].into(),
+            vertical: [0.0, 2.0 * half_height, 0.0].into(),
+        }
+    }
+
+    fn new(look_from: Vec3, look_at: Vec3, up: Vec3, vfov: f32, aspect: f32) -> Self {
+        let theta = vfov * std::f32::consts::PI / 180.0;
+        let height = 2.0 * (theta / 2.0).tan();
+        let width = aspect * height;
+        let w = unit_vector(look_from - look_at);
+        let u = unit_vector(cross(up, w));
+        let v = cross(w, u);
+        let horizontal = width * u;
+        let vertical = height * v;
+
+        Camera {
+            origin: look_from,
+            bottom_left: look_from - horizontal / 2.0 - vertical / 2.0 - w,
+            horizontal,
+            vertical,
+        }
     }
 
     /// Направляет луч из местоположения камеры в точку на виртуальном экране.
-    fn direct_ray(&self, u: f32, v: f32) -> Ray {
-        let to = self.bottom_left + u * self.horizontal + v * self.vertical;
+    fn direct_ray(&self, s: f32, t: f32) -> Ray {
+        let to = self.bottom_left + s * self.horizontal + t * self.vertical - self.origin;
 
         Ray::new(self.origin, to)
     }
@@ -675,15 +698,15 @@ fn random_in_unit_sphere() -> Vec3 {
 }
 
 /// Усредняет цвет в окрестностях пикселя, делая `samples` выборок.
-fn sampled_pixel_color<T>(camera: &Camera, object: &T, samples: i32, x: i32, y: i32) -> Vec3
+fn sampled_pixel_color<T>(camera: &Camera, object: &T, samples: i32, view: Resolution, x: i32, y: i32) -> Vec3
 where
     T: Hittable
 {
     let mut color = Vec3::default();
     let mut rng = rand::thread_rng();
     let distribution = Uniform::from(0.0..1.0 as f32);
-    let nx = camera.resolution.width;
-    let ny = camera.resolution.height;
+    let nx = view.width;
+    let ny = view.height;
 
     for _ in 0..samples {
         let random = distribution.sample(& mut rng);
@@ -697,7 +720,7 @@ where
 
     color /= samples as f32;
 
-    // Корректировка гаммы 1/2
+    // Корректировка гаммы γ = 1/2
     Vec3::new(color.r().sqrt(), color.g().sqrt(), color.b().sqrt())
 }
 
@@ -710,7 +733,7 @@ fn main() {
     println!("{} {}", width, height);
     println!("255");
 
-    let camera = Camera::with_resolution(Resolution{ width, height });
+    let camera = Camera::new([-2.0, 2.0, 1.0].into(), [0.0, 0.0, -1.0].into(), [0.0, 1.0, 0.0].into(), 20.0, width as f32 / height as f32);
     let scene = Scene{
         0: vec![
             Box::new(Sphere{
@@ -743,7 +766,7 @@ fn main() {
     // Выводим остальные пиксели построчно начиная с верхнего левого угла изображения
     for y in 0..height {
         for x in 0..width {
-            render_pixel(sampled_pixel_color(&camera, &scene, samples, x, y));
+            render_pixel(sampled_pixel_color(&camera, &scene, samples, Resolution{width, height}, x, y));
         }
     }
 }
