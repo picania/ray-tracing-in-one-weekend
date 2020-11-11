@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="AutoImportSettings">
+    <option name="autoReloadType" value="NONE" />
+  </component>
+  <component name="CargoProjects">
+    <cargoProject FILE="$PROJECT_DIR$/Cargo.toml" />
+  </component>
+  <component name="ChangeListManager">
+    <list default="true" id="ea457e9a-a113-4d0a-8a86-60c2b8b1c69c" name="Default Changelist" comment="">
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/main.rs" afterDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="MacroExpansionManager">
+    <option name="directoryName" value="8o9np8jd" />
+  </component>
+  <component name="ProjectId" id="1jlWh46RLFGkBhKPyn28IAyJNh6" />
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent">
+    <property name="RunOnceActivity.OpenProjectViewOnStart" value="true" />
+    <property name="RunOnceActivity.ShowReadmeOnStart" value="true" />
+    <property name="android.sdk.path" value="$USER_HOME$/AppData/Local/Android/Sdk" />
+    <property name="last_opened_file_path" value="$PROJECT_DIR$/../rust-raytracer-in-weekend/test.ppm" />
+    <property name="org.rust.cargo.project.model.PROJECT_DISCOVERY" value="true" />
+    <property name="project.structure.last.edited" value="SDK Location" />
+    <property name="project.structure.proportion" value="0.17" />
+    <property name="project.structure.side.proportion" value="0.0" />
+    <property name="settings.editor.selected.configurable" value="preferences.pluginManager" />
+  </component>
+  <component name="RunManager" selected="Cargo.Run raytracer-in-weekend (Debug)">
+    <list>
+      <item itemvalue="Cargo.Run raytracer-in-weekend (Debug)" />
+      <item itemvalue="Cargo.Run raytracer-in-weekend (Release)" />
+    </list>
+  </component>
+  <component name="RustProjectSettings">
+    <option name="toolchainHomeDirectory" value="$USER_HOME$/.cargo/bin" />
+    <option name="version" value="2" />
+  </component>
+  <component name="SvnConfiguration">
+    <configuration />
+  </component>
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="ea457e9a-a113-4d0a-8a86-60c2b8b1c69c" name="Default Changelist" comment="" />
+      <created>1604379274990</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1604379274990</updated>
+    </task>
+    <servers />
+  </component>
+  <component name="WindowStateProjectService">
+    <state x="451" y="194" key="#com.intellij.execution.impl.EditConfigurationsDialog" timestamp="1604382017737">
+      <screen x="74" y="0" width="1846" height="1080" />
+    </state>
+    <state x="451" y="194" key="#com.intellij.execution.impl.EditConfigurationsDialog/74.0.1846.1080@74.0.1846.1080" timestamp="1604382017737" />
+    <state x="777" y="294" key="FileChooserDialogImpl" timestamp="1604382237205">
+      <screen x="74" y="0" width="1846" height="1080" />
+    </state>
+    <state x="777" y="294" key="FileChooserDialogImpl/74.0.1846.1080@74.0.1846.1080" timestamp="1604382237205" />
+    <state width="1802" height="290" key="GridCell.Tab.0.bottom" timestamp="1604382763124">
+      <screen x="74" y="0" width="1846" height="1080" />
+    </state>
+    <state width="1802" height="290" key="GridCell.Tab.0.bottom/74.0.1846.1080@74.0.1846.1080" timestamp="1604382763124" />
+    <state width="1802" height="290" key="GridCell.Tab.0.center" timestamp="1604382763123">
+      <screen x="74" y="0" width="1846" height="1080" />
+    </state>
+    <state width="1802" height="290" key="GridCell.Tab.0.center/74.0.1846.1080@74.0.1846.1080" timestamp="1604382763123" />
+    <state width="1802" height="290" key="GridCell.Tab.0.left" timestamp="1604382763123">
+      <screen x="74" y="0" width="1846" height="1080" />
+    </state>
+    <state width="1802" height="290" key="GridCell.Tab.0.left/74.0.1846.1080@74.0.1846.1080" timestamp="1604382763123" />
+    <state width="1802" height="290" key="GridCell.Tab.0.right" timestamp="1604382763124">
+      <screen x="74" y="0" width="1846" height="1080" />
+    </state>
+    <state width="1802" height="290" key="GridCell.Tab.0.right/74.0.1846.1080@74.0.1846.1080" timestamp="1604382763124" />
+    <state x="498" y="171" key="SettingsEditor" timestamp="1604382881944">
+      <screen x="74" y="0" width="1846" height="1080" />
+    </state>
+    <state x="498" y="171" key="SettingsEditor/74.0.1846.1080@74.0.1846.1080" timestamp="1604382881944" />
+  </component>
+</project>
